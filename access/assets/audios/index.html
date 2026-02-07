@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Happy New Year</title>
+
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background: black;
+    touch-action: manipulation;
+    font-family: 'Arial', sans-serif;
+  }
+
+  canvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+  }
+
+  .ui {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    color: gold;
+    pointer-events: none;
+  }
+
+  h1 {
+    font-size: clamp(2rem, 8vw, 4rem);
+    text-shadow: 0 0 20px gold, 0 0 40px orange;
+    animation: pulse 2s infinite alternate;
+  }
+
+  p {
+    font-size: clamp(1rem, 4vw, 1.5rem);
+    color: white;
+    margin-top: 10px;
+  }
+
+  .score {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    color: white;
+    font-size: 1.2rem;
+    text-shadow: 0 0 10px cyan;
+  }
+
+  @keyframes pulse {
+    from { transform: scale(1); }
+    to { transform: scale(1.1); }
+  }
+
+  .shake {
+    animation: shake 0.2s;
+  }
+
+  @keyframes shake {
+    0% { transform: translate(0, 0); }
+    25% { transform: translate(5px, -5px); }
+    50% { transform: translate(-5px, 5px); }
+    75% { transform: translate(5px, 5px); }
+    100% { transform: translate(0, 0); }
+  }
+</style>
+</head>
+
+<body>
+
+<canvas id="canvas"></canvas>
+
+<div class="ui">
+  <h1>🎆 Happy</br> New Year</br> 2026 🎆</h1>
+  <p>Tap or Click to Launch Fireworks!</p>
+  <h2>Try to get 2026 score</h2>
+</div>
+
+<div class="score">🔥 Score: <span id="score">0</span></div>
+
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+window.addEventListener("resize", () => {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+});
+
+let particles = [];
+let score = 0;
+
+class Particle {
+  constructor(x, y, color) {
+    this.x = x;
+    this.y = y;
+    this.color = color;
+    this.radius = Math.random() * 3 + 1;
+    this.vx = (Math.random() - 0.5) * 8;
+    this.vy = (Math.random() - 0.5) * 8;
+    this.life = 100;
+  }
+
+  update() {
+    this.x += this.vx;
+    this.y += this.vy;
+    this.vy += 0.05; // gravity
+    this.life--;
+  }
+
+  draw() {
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+    ctx.fillStyle = this.color;
+    ctx.fill();
+  }
+}
+
+function explode(x, y) {
+  const color = `hsl(${Math.random() * 360}, 100%, 60%)`;
+  for (let i = 0; i < 80; i++) {
+    particles.push(new Particle(x, y, color));
+  }
+
+  score += 10;
+  document.getElementById("score").textContent = score;
+
+  // screen shake
+  document.body.classList.add("shake");
+  setTimeout(() => document.body.classList.remove("shake"), 200);
+}
+
+function animate() {
+  ctx.fillStyle = "rgba(0, 0, 0, 0.2)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  particles = particles.filter(p => p.life > 0);
+
+  particles.forEach(p => {
+    p.update();
+    p.draw();
+  });
+
+  requestAnimationFrame(animate);
+}
+
+animate();
+
+// Mouse & touch controls (mobile-friendly)
+function handleInput(e) {
+  const x = e.clientX || e.touches[0].clientX;
+  const y = e.clientY || e.touches[0].clientY;
+  explode(x, y);
+}
+
+window.addEventListener("click", handleInput);
+window.addEventListener("touchstart", handleInput);
+</script>
+
+</body>
+</html>

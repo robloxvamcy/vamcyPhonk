@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phonk Visualizer:Vamcy</title>
+
+<style>
+body{
+  margin:0;
+  color:white;
+  font-family:Arial;
+  text-align:center;
+  overflow-x:hidden;
+
+  background: linear-gradient(
+    45deg,
+    #050505,
+    #1a001f,
+    #001a1a,
+    #1a0000,
+    #050505
+  );
+  background-size: 400% 400%;
+  animation: bgMove 12s linear infinite;
+}
+@keyframes bgMove{
+  0%{background-position:0% 50%}
+  50%{background-position:100% 50%}
+  100%{background-position:0% 50%}
+}
+
+#signInView,#homeView,#playerView{
+  display:none;
+  padding:20px;
+  backdrop-filter: blur(6px);
+}
+
+#visualizer{
+  width:100%;
+  height:160px;
+  background:rgba(0,0,0,0.7);
+  border-radius:14px;
+  box-shadow:
+    0 0 20px #ff004c,
+    0 0 40px #ff004c44 inset;
+  margin-top:20px;
+}
+
+.progress-container{
+  height:8px;
+  background:#222;
+  border-radius:10px;
+  cursor:pointer;
+  margin-top:10px;
+}
+.progress{
+  height:100%;
+  width:0%;
+  background:linear-gradient(90deg,#ff004c,#ff8c00);
+}
+
+button{
+  background:none;
+  border:2px solid #ff004c;
+  color:white;
+  padding:8px 16px;
+  border-radius:20px;
+  margin:5px;
+  cursor:pointer;
+  transition:0.2s;
+}
+button:hover{
+  box-shadow:0 0 15px #ff004c;
+  transform:scale(1.05);
+}
+
+.song-item{
+  padding:10px;
+  border-bottom:1px solid #222;
+  cursor:pointer;
+}
+.song-item:hover{
+  background:rgba(255,0,76,0.15);
+}
+
+input[type=range]{
+  width:200px;
+  margin:10px;
+}
+</style>
+</head>
+
+<body>
+
+<h2>PHONK VISUALIZER</h2>
+
+<div id="signInView">
+  <input id="signInName" placeholder="Username">
+  <br><br>
+  <button onclick="signIn()">Enter</button>
+</div>
+
+<div id="homeView">
+  <input type="file" accept="audio/*" onchange="publishSong(this)">
+  <div id="songList"></div>
+</div>
+
+<div id="playerView">
+  <div id="songTitle"></div>
+  <div id="songUser" style="opacity:.6"></div>
+
+  <div class="progress-container" onclick="setProgress(event)">
+    <div class="progress" id="progress"></div>
+  </div>
+
+  <canvas id="visualizer"></canvas>
+
+  <!-- New controls -->
+  <div>
+    <label>Volume</label>
+    <input type="range" id="volumeSlider" min="0" max="1000" value="100">
+    <button id="loopBtn">Loop: Off</button>
+  </div>
+
+  <button onclick="togglePlay()">Play / Pause</button>
+  <button onclick="goHome()">Home</button>
+</div>
+
+<audio id="audio"></audio>
+
+<script>
+const audio = document.getElementById("audio");
+const canvas = document.getElementById("visualizer");
+const ctx = canvas.getContext("2d");
+const progress = document.getElementById("progress");
+
+let cw, ch;
+let audioCtx, analyser, source, gainNode;
+
+/* ---------- CANVAS ---------- */
+function resizeCanvas(){
+  const rect = canvas.getBoundingClientRect();
+  cw = rect.width;
+  ch = rect.height;
+  canvas.width = cw;
+  canvas.height = ch;
+}
+window.addEventListener("resize", resizeCanvas);
+
+/* ---------- AUDIO ---------- */
+function initAudio(){
+  if(audioCtx) return;
+
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 256;
+
+  source = audioCtx.createMediaElementSource(audio);
+
+  // Gain node for volume amplification
+  gainNode = audioCtx.createGain();
+  source.connect(gainNode);
+  gainNode.connect(analyser);
+  analyser.connect(audioCtx.destination);
+}
+
+// Play resumes AudioContext if suspended
+audio.addEventListener("play", async () => {
+  initAudio();
+  if(audioCtx.state === "suspended") await audioCtx.resume();
+});
+
+/* ---------- VISUALIZER ---------- */
+function draw(){
+  requestAnimationFrame(draw);
+  if(!analyser) return;
+
+  const data = new Uint8Array(analyser.frequencyBinCount);
+  analyser.getByteFrequencyData(data);
+
+  ctx.clearRect(0,0,cw,ch);
+
+  const bars = 50;
+  const barW = cw / bars;
+
+  for(let i=0;i<bars;i++){
+    const v = data[i];
+    const h = (v / 255) * ch;
+    ctx.fillStyle = `hsl(${i*5},100%,50%)`;
+    ctx.fillRect(i*barW, ch-h, barW-2, h);
+  }
+}
+draw();
+
+/* ---------- CONTROLS ---------- */
+function togglePlay(){
+  audio.paused ? audio.play() : audio.pause();
+}
+
+audio.addEventListener("timeupdate",()=>{
+  if(audio.duration){
+    progress.style.width =
+      (audio.currentTime / audio.duration) * 100 + "%";
+  }
+});
+
+function setProgress(e){
+  const rect = e.currentTarget.getBoundingClientRect();
+  const percent = (e.clientX - rect.left) / rect.width;
+  audio.currentTime = percent * audio.duration;
+}
+
+/* ---------- APP STATE ---------- */
+let user = localStorage.getItem("user");
+
+// Default songs baked into repo (put actual files in /audio folder)
+const defaultSongs = [
+  { name: "Montagem Coma", user: "Vamcy", url: "audio/coma.mp3" },
+  { name: "BATIDÃO", user: "Vamcy", url: "audio/batidao.mp3" },
+  { name: "FUNK UNIVERSO", user: "Vamcy", url: "audio/universo.mp3" },
+  { name: "Young Girl A Funk", user: "Vamcy", url: "audio/young girl.mp3" },
+];
+
+
+// Uploaded songs from previous session
+let uploadedSongs = JSON.parse(localStorage.getItem("songs") || "[]");
+
+// Merge default + uploaded
+let songs = [...defaultSongs, ...uploadedSongs];
+
+/* ---------- SIGN IN ---------- */
+function signIn(){
+  user = signInName.value.trim();
+  if(!user) return;
+  localStorage.setItem("user", user);
+  showHome();
+}
+
+/* ---------- HOME ---------- */
+function showHome(){
+  signInView.style.display = "none";
+  playerView.style.display = "none";
+  homeView.style.display = "block";
+  renderSongs();
+}
+
+/* ---------- UPLOAD ---------- */
+function publishSong(input){
+  const file = input.files[0];
+  if(!file) return;
+
+  const url = URL.createObjectURL(file);
+
+  songs.push({
+    name: file.name,
+    user: user,
+    url: url
+  });
+
+  // save only uploaded songs, not default
+  uploadedSongs.push({
+    name: file.name,
+    user: user,
+    url: url
+  });
+  localStorage.setItem("songs", JSON.stringify(uploadedSongs));
+
+  renderSongs();
+}
+
+/* ---------- SONG LIST ---------- */
+function renderSongs(){
+  songList.innerHTML = "";
+  songs.forEach((s,i)=>{
+    const d = document.createElement("div");
+    d.className = "song-item";
+    d.textContent = s.name + " – " + s.user;
+    d.onclick = () => playSong(i);
+    songList.appendChild(d);
+  });
+}
+
+/* ---------- PLAYER (FIXED) ---------- */
+function playSong(i){
+  homeView.style.display = "none";
+  playerView.style.display = "block";
+
+  resizeCanvas();
+
+  audio.pause();
+  audio.removeAttribute("src");
+  audio.load();
+
+  audio.src = songs[i].url;
+  songTitle.textContent = songs[i].name;
+  songUser.textContent = "by " + songs[i].user;
+
+  audio.play();
+}
+
+function goHome(){
+  audio.pause();
+  audio.currentTime = 0;
+  showHome();
+}
+
+/* ---------- LOOP ---------- */
+const loopBtn = document.getElementById("loopBtn");
+loopBtn.addEventListener("click", () => {
+  audio.loop = !audio.loop;
+  loopBtn.textContent = "Loop: " + (audio.loop ? "On" : "Off");
+});
+
+/* ---------- VOLUME ---------- */
+const volumeSlider = document.getElementById("volumeSlider");
+volumeSlider.addEventListener("input", () => {
+  if(!gainNode) return;
+  gainNode.gain.value = volumeSlider.value / 100; // 100 -> 1x, 1000 -> 10x
+});
+
+/* ---------- START ---------- */
+if(user){
+  showHome();
+}else{
+  signInView.style.display = "block";
+}
+</script>
+
+</body>
+</html>
